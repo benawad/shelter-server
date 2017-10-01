@@ -34,12 +34,11 @@ export default {
     guestList: async (parent, args, { models, donorId }, info) => {
       const response = await models.sequelize.query(
         `
-      select shelters.id as "shelterId", guests.id as "guestId", requests.rooms as "rooms", shelters.name as "shelterName", guests.name as "guestName", guests."phoneNumber" as "guestPhonenumber" from donors, requests, shelters, guests where donors.id = ${donorId} and donors.id = shelters."donorId" and shelters.id = requests."shelterId" and requests.touched = false;
+      select shelters.id as "shelterId", guests.id as "guestId", requests.rooms as "rooms", shelters.name as "shelterName", guests.name as "guestName", guests."phoneNumber" as "guestPhonenumber" from donors, requests, shelters, guests where  ${donorId} = shelters."donorId" and shelters.id = requests."shelterId" and requests.touched = false and guests.id = requests."guestId";
       `,
         { type: models.sequelize.QueryTypes.SELECT },
       );
-      console.log('BEFORE');
-      console.log(response[0].rooms);
+
       const normalizeResponse = response.map(x => ({
         rooms: x.rooms,
         shelter: {
@@ -52,8 +51,7 @@ export default {
           phoneNumber: x.guestPhonenumber,
         },
       }));
-      console.log('HERE');
-      console.log(normalizeResponse);
+
       return normalizeResponse;
     },
   },
@@ -118,32 +116,30 @@ export default {
         };
       }
     },
-    decideOnGuest: async (parent, args, { models }) =>
-      models.Request.update(
-        { accepted: args.accepted, touched: false },
-        { where: { guestId: args.guestId, shelterId: args.shelterId } },
-      ),
-    // register: async (parent, args, { models }) => {
-    //   const hashedPassword = await bcrypt.hash(args.password, 12);
-    //   try {
-    //     const user = await models.User.create({
-    //       ...args,
-    //       password: hashedPassword,
-    //     });
-    //     return {
-    //       ok: true,
-    //       user,
-    //     };
-    //   } catch (e) {
-    //     return {
-    //       ok: false,
-    //       errors: formatErrors(e, models),
-    //     };
-    //   }
-    // },
-    // login: async (parent, { email, password }, { models, SECRET, SECRET_2 }) =>
-    //   tryLogin(email, password, models, SECRET, SECRET_2),
-    // refreshTokens: (parent, { token, refreshToken }, { models, SECRET, SECRET_2 }) =>
-    //   refreshTokens(token, refreshToken, models, SECRET, SECRET_2),
+    decideOnGuest: async (parent, args, { models }) => {
+      try {
+        await models.Request.update(
+          { accepted: args.accepted, touched: true },
+          {
+            where: { guestId: args.guestId, shelterId: args.shelterId },
+          },
+        );
+
+        if (args.accepted) {
+          models.sequelize.query(`
+          update shelters set occupancy = occupancy - requests.rooms from requests where requests."shelterId" = ${args.shelterId} and requests."guestId" = ${args.guestId}
+          `);
+        }
+
+        return {
+          ok: true,
+        };
+      } catch (e) {
+        return {
+          ok: false,
+          errors: formatErrors(e, models),
+        };
+      }
+    },
   },
 };
