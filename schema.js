@@ -14,6 +14,7 @@ export default `
 
   type Shelter {
     id: Int!
+    name: String!
     occupancy: Int!
     shower: Boolean!
     food: Boolean!
@@ -50,14 +51,29 @@ export default `
     guest: Guest
   }
 
+  type VoidResponse {
+    ok: Boolean!
+    errors: [Error!]
+  }
+
+  type Request {
+    shelter: Shelter!
+    guest: Guest!
+    accepted: Boolean!
+    rooms: Int!
+  }
+
   type Query {
     allShelters: [Shelter!]!
+    guestList: [Request!]!
   }
 
   type Mutation {
     createShelter: ShelterResponse!
     createDonor(name: String!, email: String!, password: String!): DonorResponse!
     createGuest(name: String!, phoneNumber: String!): GuestResponse!
+    createShelterRequest(shelterId: Int!, rooms: Int!): VoidResponse!
+    decideOnGuest(guestId: Int!, shelterId: Int!, accepted: Boolean!): VoidResponse!
   }
 
   type Subscription {

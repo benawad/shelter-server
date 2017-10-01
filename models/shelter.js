@@ -1,5 +1,8 @@
 export default (sequelize, DataTypes) => {
   const Shelter = sequelize.define('shelter', {
+    name: {
+      type: DataTypes.STRING,
+    },
     occupancy: {
       type: DataTypes.INTEGER,
     },

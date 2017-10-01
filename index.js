@@ -28,22 +28,10 @@ const SECRET = 'aslkdjlkaj10830912039jlkoaiuwerasdjflkasd';
 const app = express();
 
 const addUser = async (req, res, next) => {
-  const token = req.headers['x-token'];
-  if (token) {
-    try {
-      const { user } = jwt.verify(token, SECRET);
-      req.user = user;
-    } catch (err) {
-      const refreshToken = req.headers['x-refresh-token'];
-      const newTokens = await refreshTokens(token, refreshToken, models, SECRET);
-      if (newTokens.token && newTokens.refreshToken) {
-        res.set('Access-Control-Expose-Headers', 'x-token, x-refresh-token');
-        res.set('x-token', newTokens.token);
-        res.set('x-refresh-token', newTokens.refreshToken);
-      }
-      req.user = newTokens.user;
-    }
-  }
+  const guestId = req.headers['x-guest-id'];
+  const donorId = req.headers['x-donor-id'];
+  req.guestId = guestId;
+  req.donorId = donorId;
   next();
 };
 
@@ -65,14 +53,15 @@ app.use(
     context: {
       models,
       SECRET,
-      user: req.user,
+      guestId: req.guestId,
+      donorId: req.donorId,
     },
   })),
 );
 
 const server = createServer(app);
 
-models.sequelize.sync({ force: true }).then(() =>
+models.sequelize.sync().then(() =>
   server.listen(3030, () => {
     new SubscriptionServer(
       {

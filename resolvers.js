@@ -31,13 +31,38 @@ export default {
         sql => models.sequelize.query(sql, { type: models.sequelize.QueryTypes.SELECT }),
         { dialect: 'pg' },
       ),
+    guestList: async (parent, args, { models, donorId }, info) => {
+      const response = await models.sequelize.query(
+        `
+      select shelters.id as "shelterId", guests.id as "guestId", requests.rooms as "rooms", shelters.name as "shelterName", guests.name as "guestName", guests."phoneNumber" as "guestPhonenumber" from donors, requests, shelters, guests where donors.id = ${donorId} and donors.id = shelters."donorId" and shelters.id = requests."shelterId" and requests.touched = false;
+      `,
+        { type: models.sequelize.QueryTypes.SELECT },
+      );
+      console.log('BEFORE');
+      console.log(response[0].rooms);
+      const normalizeResponse = response.map(x => ({
+        rooms: x.rooms,
+        shelter: {
+          id: x.shelterId,
+          name: x.shelterName,
+        },
+        guest: {
+          id: x.guestId,
+          name: x.guestName,
+          phoneNumber: x.guestPhonenumber,
+        },
+      }));
+      console.log('HERE');
+      console.log(normalizeResponse);
+      return normalizeResponse;
+    },
   },
 
   Mutation: {
     createShelter: (parent, args, { models }) => models.Shelter.create(args),
-    createDonor: (parent, args, { models }) => {
+    createDonor: async (parent, args, { models }) => {
       try {
-        const donor = models.Donor.create(args);
+        const donor = await models.Donor.create(args);
         return {
           ok: true,
           donor,
@@ -45,13 +70,13 @@ export default {
       } catch (e) {
         return {
           ok: false,
-          errors: formatErrors(e),
+          errors: formatErrors(e, models),
         };
       }
     },
-    createGuest: (parent, args, { models }) => {
+    createGuest: async (parent, args, { models }) => {
       try {
-        const guest = models.Guest.create(args);
+        const guest = await models.Guest.create(args);
         return {
           ok: true,
           guest,
@@ -59,10 +84,45 @@ export default {
       } catch (e) {
         return {
           ok: false,
-          errors: formatErrors(e),
+          errors: formatErrors(e, models),
         };
       }
     },
+    createShelterRequest: async (parent, args, { models, guestId }) => {
+      try {
+        await models.Request.create({
+          ...args,
+          guestId,
+        });
+
+        // const updateShelterPromise = models.Shelter.update(
+        //   {
+        //     occupancy: models.sequelize.literal(`occupancy - ${args.rooms}`),
+        //   },
+        //   { where: { id: args.shelterId } },
+        // );
+
+        // await Promise.all([shelterRequestPromise, updateShelterPromise]);
+
+        // pubsub.publish(OCCUPANCY_CHANGED, {
+        //   occupancyChange: -args.rooms,
+        // });
+
+        return {
+          ok: true,
+        };
+      } catch (e) {
+        return {
+          ok: false,
+          errors: formatErrors(e, models),
+        };
+      }
+    },
+    decideOnGuest: async (parent, args, { models }) =>
+      models.Request.update(
+        { accepted: args.accepted, touched: false },
+        { where: { guestId: args.guestId, shelterId: args.shelterId } },
+      ),
     // register: async (parent, args, { models }) => {
     //   const hashedPassword = await bcrypt.hash(args.password, 12);
     //   try {
