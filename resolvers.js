@@ -9,6 +9,7 @@ import { refreshTokens, tryLogin } from './auth';
 export const pubsub = new PubSub();
 
 const OCCUPANCY_CHANGED = 'OCCUPANCY_CHANGED';
+const ACCEPTED = 'ACCEPTED';
 
 const formatErrors = (e, models) => {
   if (e instanceof models.sequelize.ValidationError) {
@@ -22,8 +23,15 @@ export default {
     occupancyChange: {
       subscribe: () => pubsub.asyncIterator(OCCUPANCY_CHANGED),
     },
+    accepted: {
+      subscribe: () => pubsub.asyncIterator(ACCEPTED),
+    },
   },
   Query: {
+    justAccepted: (parent, args, { models, guestId }) =>
+      models.sequelize.query(`
+      select address from shelters, requests where requests."guestId" = ${guestId} and viewed = false and accepted = true;
+    `),
     allShelters: (parent, args, { models }, info) =>
       joinMonster(
         info,
@@ -57,7 +65,19 @@ export default {
   },
 
   Mutation: {
-    createShelter: (parent, args, { models }) => models.Shelter.create(args),
+    createShelter: async (parent, args, { models, donorId }) => {
+      try {
+        await models.Shelter.create({ ...args, donorId });
+        return {
+          ok: true,
+        };
+      } catch (e) {
+        return {
+          ok: true,
+          errors: formatErrors(e),
+        };
+      }
+    },
     createDonor: async (parent, args, { models }) => {
       try {
         const donor = await models.Donor.create(args);
@@ -129,6 +149,9 @@ export default {
           models.sequelize.query(`
           update shelters set occupancy = occupancy - requests.rooms from requests where requests."shelterId" = ${args.shelterId} and requests."guestId" = ${args.guestId}
           `);
+          pubsub.publish(ACCEPTED, {
+            accepted: models.Shelter.findOne({ where: { id: args.shelterId } }),
+          });
         }
 
         return {

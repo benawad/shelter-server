@@ -20,12 +20,7 @@ export default `
     food: Boolean!
     address: String!
     description: String!
-    pictureUrl: String!
-  }
-
-  type AuthPayload {
-    token: String!
-    refreshToken: String!
+    pictureUrl: String
   }
 
   type Error {
@@ -61,15 +56,17 @@ export default `
     guest: Guest!
     accepted: Boolean!
     rooms: Int!
+    viewed: Boolean!
   }
 
   type Query {
     allShelters: [Shelter!]!
     guestList: [Request!]!
+    justAccepted: [Shelter!]
   }
 
   type Mutation {
-    createShelter: ShelterResponse!
+    createShelter(name: String!, address: String!, description: String!, occupancy: Int!, shower: Boolean!, food: Boolean!): VoidResponse!
     createDonor(name: String!, email: String!, password: String!): DonorResponse!
     createGuest(name: String!, phoneNumber: String!): GuestResponse!
     createShelterRequest(shelterId: Int!, rooms: Int!): VoidResponse!
@@ -78,6 +75,7 @@ export default `
 
   type Subscription {
     occupancyChange: Shelter
+    accepted: Shelter
   }
 
   schema {
